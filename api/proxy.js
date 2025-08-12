@@ -1,22 +1,23 @@
 export default async function handler(req, res) {
-  const { prompt, size = "1024x1024" } = req.query;
+  let { prompt, size = "1024x1024" } = req.query;
 
+  // 如果沒給 prompt，使用預設內容
   if (!prompt) {
-    return res.status(400).json({ error: "Missing 'prompt' query parameter" });
+    prompt = "A beautiful view of Taipei 101 at sunset, ultra realistic";
   }
 
   try {
     // Pollinations API URL
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?size=${encodeURIComponent(size)}`;
 
-    // 轉發請求到 Pollinations
+    // 發請求到 Pollinations
     const response = await fetch(pollinationsUrl);
 
     if (!response.ok) {
       throw new Error(`Pollinations API error: ${response.status}`);
     }
 
-    // 設定圖片回傳
+    // 設定回應為圖片
     res.setHeader("Content-Type", "image/png");
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
