@@ -6,43 +6,46 @@ export default async function handler(req, res) {
   }
 
   try {
+    // 嘗試 Pollinations API
     const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?size=${encodeURIComponent(size)}`;
+    const pollRes = await fetch(pollinationsUrl);
 
-    // 取得 Pollinations 圖片
-    const response = await fetch(pollinationsUrl);
-    if (!response.ok) {
-      throw new Error(`Pollinations API error: ${response.status}`);
+    if (pollRes.ok) {
+      const buffer = await pollRes.arrayBuffer();
+      res.setHeader("Content-Type", "image/png");
+      return res.send(Buffer.from(buffer));
+    } else {
+      throw new Error(`Pollinations failed: ${pollRes.status}`);
     }
+  } catch (err) {
+    console.warn("Pollinations 掛了，改用備用 API", err.message);
 
-    const buffer = await response.arrayBuffer();
-    const base64Image = Buffer.from(buffer).toString("base64");
+    try {
+      // 備用 API：這裡用 OpenAI DALL·E 作範例
+      const dalleRes = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          prompt,
+          size
+        })
+      });
 
-    // 上傳到 Imgur
-    const uploadResponse = await fetch("https://api.imgur.com/3/image", {
-      method: "POST",
-      headers: {
-        Authorization: `Client-ID ${process.env.IMGUR_CLIENT_ID}`, // Vercel 環境變數
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        image: base64Image,
-        type: "base64",
-      }),
-    });
+      const dalleData = await dalleRes.json();
 
-    const uploadData = await uploadResponse.json();
-
-    if (!uploadData.success) {
-      throw new Error("Imgur upload failed");
+      if (dalleData.data && dalleData.data[0]?.b64_json) {
+        const imgBuffer = Buffer.from(dalleData.data[0].b64_json, "base64");
+        res.setHeader("Content-Type", "image/png");
+        return res.send(imgBuffer);
+      } else {
+        throw new Error("DALL·E 沒回圖片");
+      }
+    } catch (backupErr) {
+      console.error("備用 API 也失敗", backupErr.message);
+      return res.status(500).json({ error: "All image generation services failed" });
     }
-
-    // 回傳圖片網址
-    res.status(200).json({
-      image_url: uploadData.data.link
-    });
-
-  } catch (error) {
-    console.error("Proxy Error:", error);
-    res.status(500).json({ error: "Failed to generate image" });
   }
 }
