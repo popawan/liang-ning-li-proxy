@@ -1,7 +1,7 @@
 export default async function handler(req, res) {
   let { prompt, size = "1024x1024" } = req.query;
 
-  // 如果沒給 prompt，使用預設內容
+  // 預設 prompt（台北 101）
   if (!prompt) {
     prompt = "A beautiful view of Taipei 101 at sunset, ultra realistic";
   }
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
       throw new Error(`Pollinations API error: ${response.status}`);
     }
 
-    // 設定回應為圖片
+    // 設定回應為 PNG 圖片
     res.setHeader("Content-Type", "image/png");
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
